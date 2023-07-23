@@ -325,6 +325,8 @@ class MassCompositionAccessor:
         Returns:
 
         """
+        if not self.check_size_allignment(other=other):
+            self.interpolate_distributions(other=other)
 
         xr.set_options(keep_attrs=True)
 
@@ -491,6 +493,53 @@ class MassCompositionAccessor:
         xr_upsampled: xr.Dataset = interp_monotonic(self._obj, coords={'size': new_coords},
                                                     include_original_coords=True)
         return xr_upsampled
+
+    def interpolate_distributions(self, other: xr.Dataset) -> (xr.Dataset, xr.Dataset):
+        """
+
+        Args:
+            other:
+
+        Returns:
+
+        """
+        interval_list = list()
+        self_intervals = set(self._obj.indexes['size'].to_tuples().values)
+        other_intervals = set(other.indexes['size'].to_tuples().values)
+        intervals_to_keep = self_intervals.union(other_intervals) - self_intervals.intersection(other_intervals)
+
+        [interval_list.extend([interval[0], interval[1]]) for interval in intervals_to_keep]
+        passing = xr.DataArray(sorted(list(set(interval_list))[1:], reverse=True))
+        retained = xr.DataArray(sorted(list(set(interval_list))[:-1], reverse=True))
+
+
+        other_values_within_intervals = [interval_list.extend(list(interval.left, interval.right)) for interval in
+                                   other.composition_to_mass()['size'].values]
+
+        all_values = sorted(values_within_intervals.extend(other_values_within_intervals))
+        logging.info(all_values)
+
+
+
+    def check_size_allignment(self, other: xr.Dataset) -> bool:
+        """
+        Checks if the size distribution between datasets is compatable.
+        Args:
+            other:
+
+        Returns:
+
+        """
+
+        if ('size' in list(other.dims.keys())) & ('size' in list(self._obj.dims.keys())):
+            if self.composition_to_mass()['size'].isin(other.mc.composition_to_mass()['size']).all() or \
+                    other.mc.composition_to_mass()['size'].isin(self.composition_to_mass()['size']).all():
+                return True
+
+            else:
+                return False
+        else:
+            return True
 
 
 def mc_aggregate(xr_ds: xr.Dataset) -> xr.Dataset:
